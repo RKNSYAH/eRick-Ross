@@ -39,7 +39,7 @@ function App() {
           </div>
         </section>
       </div>
-      <div className="fixed bottom-0 left-0 w-full px-3 pb-3 bg-primary">
+      <div className="fixed bottom-2 left-0 w-full px-3 pb-3 bg-primary">
         <div className="max-w-3xl mx-auto shadow-md shadow-secondary/40 rounded-3xl bg-white p-2">
           <ChatField />
         </div>
