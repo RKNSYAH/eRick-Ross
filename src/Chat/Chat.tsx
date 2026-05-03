@@ -1,65 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ChatField from '../Components/ChatField.tsx'
-import { GoogleGenAI } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
+import { useChat } from '../hooks/useChat.tsx';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-const SYSTEM_INSTRUCTION = import.meta.env.VITE_GEMINI_INSTRUCTION
-type Message = {
-  role: 'user' | 'ai';
-  text: string;
-  isLoading?: boolean;
-};
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputMessage, setInputMessage] = useState("")
+  const {messages, sendMessage} = useChat()
 
-  const chat = genAI.chats.create({
-    model: 'gemini-3.1-flash-lite-preview',
-    config: {
-      temperature: 0.2,
-      maxOutputTokens: 1024,
-      systemInstruction: SYSTEM_INSTRUCTION
-    },
-  })
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-  async function sendChatMessage() {
-    if (!inputMessage.trim()) return; // Prevent sending empty messages
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-    setMessages(prev => [
-      ...prev,
-      { role: 'user', text: inputMessage },
-      { role: 'ai', text: '', isLoading: true }
-    ]);
-
-    try {
-      const response = await chat.sendMessage({
-        message: inputMessage,
-      });
-      setInputMessage("");
-      setMessages(prev => {
-        const updated = [...prev];
-        const lastIndex = updated.length - 1;
-
-        if (response.text) {
-          updated[lastIndex] = {
-            role: 'ai',
-            text: response.text,
-            isLoading: false
-          };
-        }
-
-        return updated;
-      });
-    } catch (error) {
-      console.error('Error sending message:', error);
-    } finally {
-      setInputMessage("");
-    }
-  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -73,7 +30,7 @@ function App() {
   return (
     <div className='flex flex-col items-center pb-20 justify-center min-h-screen bg-primary px-3 py-3 overflow-x-hidden'>
 
-      <div id="app" className={"mb-4 w-0 max-h-130 overflow-hidden transition-all duration-700 max-w-3xl shadow-md shadow-secondary/40 rounded-4xl bg-white flex flex-col" + (isExpanded ? " h-150 w-full" : "w-0 h-0")}>
+      <div id="app" className={"mb-4 w-0 max-h-140 overflow-hidden transition-all duration-700 max-w-3xl shadow-md shadow-secondary/40 rounded-4xl bg-white flex flex-col" + (isExpanded ? " h-150 w-full" : "w-0 h-0")}>
         <div className="overflow-y-auto mr-1.5 my-0.5 h-full [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-3xl [&::-webkit-scrollbar-thumb]:bg-gray-300">
 
           <section id="header" className="flex flex-col w-full items-start justify-between p-4 md:p-6 text-center">
@@ -109,10 +66,11 @@ function App() {
                             <div className="text-sm text-left font-normal max-w-72">
 
                               <ReactMarkdown key={index} >
-                                {message.role === 'ai' ? message.text : message.text}
+                                {message.text}
                               </ReactMarkdown>
                             </div>
                           )}
+                          <div ref={messagesEndRef} />
                         </div>
                       </div>
                     </>
@@ -128,7 +86,7 @@ function App() {
       </div>
       <div className="fixed bottom-2 left-0 w-full px-3 pb-3 bg-primary">
         <div className="max-w-3xl mx-auto shadow-md shadow-secondary/40 rounded-3xl bg-white p-2">
-          <ChatField prop={setInputMessage} inputMessage={inputMessage} onSend={sendChatMessage} />
+          <ChatField onSend={sendMessage} />
         </div>
       </div>
     </div >
