@@ -3,15 +3,30 @@ import ChatField from '../Components/ChatField.tsx'
 import ReactMarkdown from 'react-markdown';
 import { useChat } from '../hooks/useChat.tsx';
 import remarkGfm from "remark-gfm";
+import {useLocation} from "react-router"
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const { messages, sendMessage } = useChat()
+  const location = useLocation();
+  const hasProcessedInitial = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    const initialMessage = (location.state as { initialMessage?: string })?.initialMessage;
+
+    if (initialMessage && !hasProcessedInitial.current) {
+      hasProcessedInitial.current = true;
+      sendMessage(initialMessage);
+
+      // Clear the state so refreshing doesn't re-send
+      window.history.replaceState({}, '');
+    }
+  }, [location.state, sendMessage]);
 
   useEffect(() => {
     scrollToBottom();

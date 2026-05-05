@@ -12,6 +12,22 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
 );
 
+const FILE_CATEGORY_MAP: Record<string, string> = {
+  "Course Description All SU Courses_2024.pdf": "Course Catalog",
+  "CS Curriculum 2024 signed.pdf": "Academic Programs",
+  "SU_Handbook_2025.pdf": "Institutional Policy",
+  "CS Degree Plan 24-25 (2) (1).pdf": "Academic Planning",
+  "Lecture_Academic_Portal_Manual.pdf": "Systems & Tools",
+  "Student_Academic_Portal_Manual.pdf": "Systems & Tools",
+  "[SU] WEB_Academic Calendar design, AY 2025.pdf": "Schedules & Logistics",
+  "CONTACTS General Sampoerna University.pdf": "Campus Directory",
+  "Sampoerna University Course List - AY 24.pdf": "Course Catalog",
+  "Sampoerna University Class Schedule - UG.pdf": "Schedules & Logistics",
+  "User_Manual-GPA_Calculator.pdf": "Systems & Tools",
+  "Degree Plan Flowchart - CS 24-25.pdf": "Academic Planning",
+  "[SU] Academic Calendar design, AY 2026.pdf": "Schedules & Logistics",
+};
+
 // split files into multiple chunks to optimize token and query time
 function chunkDocuments(text: TextResult) {
 const chunks = [];

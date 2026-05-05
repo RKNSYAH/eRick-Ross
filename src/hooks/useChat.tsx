@@ -42,24 +42,88 @@ const dedupeChunks = (chunks: Chunk[]): Chunk[] => {
   });
 };
 
+type CategoryRule = {
+  category: string;
+  // Primary keywords: strong signals (score +3)
+  primary: RegExp;
+  // Secondary keywords: weaker signals (score +1)
+  secondary: RegExp;
+};
+
+const CATEGORY_RULES: CategoryRule[] = [
+  {
+    category: "Course Catalog",
+    primary: /\b(comp\d{4}|isys\d{4}|mata\d{4}|gmat\d{4}|vcdd\d{4}|ghum\d{4}|course\s+code|course\s+description|what\s+is\s+[a-z]{4}\d{4}|course\s+list|course\s+catalog)\b/i,
+    secondary: /\b(course|subject|class|module|elective|compulsory|offered|syllabus|outline)\b/i,
+  },
+  {
+    category: "Campus Directory",
+    primary: /\b(email|contact|phone|bursary|registry|spac|student\s+affairs|mas\s+arry|vcd\s+lab|book\s+(a\s+)?room|book\s+equipment|facility\s+booking)\b/i,
+    secondary: /\b(office|department|reach|who|address|staff|admin|booking|reserve)\b/i,
+  },
+  {
+    category: "Systems & Tools",
+    primary: /\b(portal|canvas|acadis|gpa\s+calculator|lms|how\s+to\s+(login|log\s*in|access|register\s+online|use))\b/i,
+    secondary: /\b(system|platform|app|website|online|software|tool|account|password|reset)\b/i,
+  },
+  {
+    category: "Schedules & Logistics",
+    primary: /\b(academic\s+calendar|class\s+schedule|midterm\s+schedule|final\s+exam\s+schedule|semester\s+dates|when\s+(is|does|do)\s+(the|my))\b/i,
+    secondary: /\b(calendar|schedule|timetable|deadline|date|time|when|location|where)\b/i,
+  },
+  {
+    category: "Academic Programs",
+    primary: /\b(curriculum|graduate\s+profile|study\s+program|program\s+outcome|scientific\s+vision|degree\s+program|computer\s+science\s+program|vcd\s+program)\b/i,
+    secondary: /\b(program|faculty|vision|mission|goal|objective|learning\s+outcome)\b/i,
+  },
+  {
+    category: "Academic Planning",
+    primary: /\b(prerequisite|semester\s+flow|degree\s+path|study\s+plan|krs|kartu\s+rencana|course\s+plan|plan\s+my\s+(semester|courses?|subjects?))\b/i,
+    secondary: /\b(plan|planning|path|sequence|next\s+semester|which\s+(course|subject|class)|choose|pick|take\s+next|advisor|advising)\b/i,
+  },
+  {
+    category: "Institutional Policy",
+    primary: /\b(gpa\s+requirement|credit\s+load|maximum\s+credits?|code\s+of\s+conduct|academic\s+probation|graduation\s+requirement|attendance\s+policy|grading\s+(system|scale|policy)|retake\s+policy|academic\s+leave|withdrawal\s+policy)\b/i,
+    secondary: /\b(gpa|credits?|policy|policies|regulation|rule|requirement|probation|graduation|allowed|permitted|maximum|minimum|limit|how\s+many|can\s+i\s+take|grade|grading|attendance|leave|drop|withdraw|retake|repeat|sanction|suspend)\b/i,
+  },
+];
+
+/**
+ * Scores each category based on keyword matches.
+ * Returns the highest-scoring category, or "Null" if no meaningful match.
+ */
 const classifyQuestion = (input: string): string => {
   const text = input.toLowerCase();
 
-  const rules: [string, RegExp][] = [
-    ["Course Catalog", /\b(course|comp\d{4}|isys\d{4}|mata\d{4}|credits?\s+\d|course\s+code|what\s+is\s+[a-z]{4}\d{4})\b/i],
-    ["Campus Directory", /\b(email|emails|contacts|contact|phone|office|department|who\s+(is|do\s+i)|bursary|registry|spac)\b/i],
-    ["Systems & Tools", /\b(portal|canvas|gpa\s+calculator|how\s+do\s+i\s+(use|access|log\s*in)|lms|system)\b/i],
-    ["Schedules & Logistics", /\b(schedule|midterm|final\s+exam|when\s+is|class\s+time|location|room\s+\d)\b/i],
-    ["Academic Programs", /\b(curriculum|graduate\s+profile|study\s+program|vision|mission|program\s+outcome)\b/i],
-    ["Academic Planning", /\b(prerequisite|semester\s+flow|degree\s+path|major|minor|concentration|study\s+plan)\b/i],
-    ["Institutional Policy", /\b(gpa|policy|regulation|rule|requirement|code\s+of\s+conduct|probation|graduation|credit\s+load|maximum\s+credits?)\b/i],
-  ];
+  const scores: { category: string; score: number }[] = CATEGORY_RULES.map(rule => {
+    let score = 0;
 
-  for (const [category, regex] of rules) {
-    if (regex.test(text)) return category;
+    // Count primary matches (strong signal)
+    const primaryMatches = text.match(rule.primary);
+    if (primaryMatches) {
+      score += primaryMatches.length * 3;
+    }
+
+    // Count secondary matches (weak signal)
+    const secondaryMatches = text.match(rule.secondary);
+    if (secondaryMatches) {
+      score += secondaryMatches.length * 1;
+    }
+
+    return { category: rule.category, score };
+  });
+
+  // Sort by score descending
+  scores.sort((a, b) => b.score - a.score);
+
+  const topScore = scores[0];
+
+  // Minimum threshold: need at least 1 primary match OR 2+ secondary matches
+  if (topScore.score < 2) {
+    return "Null";
   }
 
-  return "Null";
+  return topScore.category;
 };
 
 const detectRelevantSection = (input: string) => {
