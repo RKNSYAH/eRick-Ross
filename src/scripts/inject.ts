@@ -15,8 +15,8 @@ const supabase = createClient(
 // split files into multiple chunks to optimize token and query time
 function chunkDocuments(text: TextResult) {
 const chunks = [];
-const chunkSize = 3500; // max characters per chunk (context size)
-const overlap = 80;  // shared characters between chunks
+const chunkSize = 2000; // max characters per chunk (context size)
+const overlap = 200;  // shared characters between chunks
 for (let i = 0; i < text.text.length; i += chunkSize - overlap) {
   chunks.push(text.text.slice(i, i + chunkSize));
 }

@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import ChatField from '../Components/ChatField.tsx'
 import ReactMarkdown from 'react-markdown';
 import { useChat } from '../hooks/useChat.tsx';
-
+import remarkGfm from "remark-gfm";
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const {messages, sendMessage} = useChat()
+  const { messages, sendMessage } = useChat()
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollToBottom = () => {
@@ -41,7 +41,7 @@ function App() {
                     <img src="/sulogo.png" className='w-7 h-7 md:w-9 md:h-9 rounded-full border-3 border-primary' alt="eRick Ross Logo" />
                     <div className="relative mt-5">
                       <div className="relative color-primary bg-primary text-white px-4 py-2 rounded-2xl rounded-tr-none shadow-md">
-                        <p className="text-sm text-left font-normal max-w-72">{message.role === 'user' ? message.text : message.text}</p>
+                        <p className="text-sm text-left font-normal max-w-md">{message.role === 'user' ? message.text : message.text}</p>
                       </div>
                     </div>
                   </div>
@@ -63,9 +63,9 @@ function App() {
                               <div className="h-2 w-3/4 rounded bg-gray-200"></div>
                             </div>
                           ) : (
-                            <div className="text-sm text-left font-normal max-w-72">
+                            <div className="prose prose-sm prose-invert prose-p:text-white prose-headings:text-white prose-strong:text-white prose-li:text-white prose-a:text-white prose-hr:border-white/30 max-w-md text-left prose-p:my-2 prose-ul:my-2 prose-li:my-1 prose-hr:my-3">
 
-                              <ReactMarkdown key={index} >
+                              <ReactMarkdown skipHtml={false} remarkPlugins={[remarkGfm]} key={index} >
                                 {message.text}
                               </ReactMarkdown>
                             </div>
