@@ -7,18 +7,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {/* Preload tells browser to start downloading immediately */}
+        {/* Preload tells browser to start fetching immediately */}
         <link
           rel="modulepreload"
           href="https://app.realeye.io/sdk/js/testRunnerEmbeddableSdk-1.10.0.js"
         />
         <Meta />
         <Links />
-        {/* Module script executes after preload is ready */}
-        <script type="module" dangerouslySetInnerHTML={{ __html: `
-          import EmbeddedPageSdk from "https://app.realeye.io/sdk/js/testRunnerEmbeddableSdk-1.10.0.js";
-          window.reSdk = new EmbeddedPageSdk(false, null, false, false);
-        `}} />
+        {/* Initialize SDK as early as possible */}
       </head>
       <body>
         {children}

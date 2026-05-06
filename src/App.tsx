@@ -2,6 +2,7 @@ import './App.css'
 import ChatField from './Components/ChatField'
 import FaqButton from './Components/FaqButton'
 import { useNavigate } from "react-router";
+import { useEffect } from "react";
 
 
 export async function loader() {
@@ -9,8 +10,35 @@ export async function loader() {
   return null;
 }
 
+
 function App() {
   const navigate = useNavigate();
+
+
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      const module = await import(
+        "https://app.realeye.io/sdk/js/testRunnerEmbeddableSdk-1.10.0.js"
+      );
+
+      const EmbeddedPageSdk = module.default;
+
+      // Wait one frame to ensure DOM is painted
+      requestAnimationFrame(() => {
+        if (!isMounted) return;
+
+        window.reSdk = new EmbeddedPageSdk(false, null, false, false);
+
+        console.log("✅ RealEye initialized AFTER UI ready");
+      });
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const faqs = [
     {
