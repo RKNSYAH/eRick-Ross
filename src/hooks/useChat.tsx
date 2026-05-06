@@ -3,14 +3,9 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import SYSTEM_INSTRUCTION from "../prompts/system.md?raw";
 import { compressContext } from "../scripts/compressText";
+import {useLoaderData} from "react-router"
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_PUBLISHABLE_KEY!,
-);
 
 type Message = {
   role: "user" | "ai";
@@ -25,8 +20,8 @@ type Chunk = {
 
 const cleanContextNoise = (text: string): string => {
   return text
-    .replace(/[k]\s[o]\s[o]\s[b]\s[d]\s[n]\s[a]\s[H]\s[t]\s[n]\s[e]\s[d]\s[u]\s[t]\s[S]/gi, '')
-    .replace(/Sampoerna University\s*\|\s*/gi, '')
+  .replace(/[k]\s[o]\s[o]\s[b]\s[d]\s[n]\s[a]\s[H]\s[t]\s[n]\s[e]\s[d]\s[u]\s[t]\s[S]/gi, '')
+  .replace(/Sampoerna University\s*\|\s*/gi, '')
     .replace(/NO\s+COURSE\s+OWNER\s+SU\s+CODES\s+COURSE\s+TITLE\s+CREDITS\s+COURSE\s+GROUPING\s+YEAR\s+SEMESTER\s+OFFERED/gi, '')
     .replace(/--\s\d+\sof\s\d+\s--/g, '')
     .replace(/\s\s+/g, ' ')
@@ -90,29 +85,29 @@ const CATEGORY_RULES: CategoryRule[] = [
 /**
  * Scores each category based on keyword matches.
  * Returns the highest-scoring category, or "Null" if no meaningful match.
- */
+*/
 const classifyQuestion = (input: string): string => {
   const text = input.toLowerCase();
-
+  
   // ════════════════════════════════════════════
   // INTENT OVERRIDES (check these first)
   // ════════════════════════════════════════════
-
+  
   // If asking about WHO teaches/runs something → Campus Directory
   if (/who\s+(teaches?|is\s+teaching|is\s+the\s+(lecturer|instructor|prof|teacher)|runs?|manages?|handles?)/i.test(text)) {
     return "Campus Directory";
   }
-
+  
   // If asking about a specific person's email/contact → Campus Directory
   if (/\b(email|contact)\s+(of|for)\b/i.test(text)) {
     return "Campus Directory";
   }
-
+  
   // If asking "what is [COURSE_CODE]" → Course Catalog
   if (/what\s+is\s+[a-z]{4}\d{4}/i.test(text)) {
     return "Course Catalog";
   }
-
+  
   // If asking "how many credits can I take" → Institutional Policy
   if (/how\s+many\s+(credits?|subjects?|courses?)\s+(can|am\s+i\s+allowed)/i.test(text)) {
     return "Institutional Policy";
@@ -134,25 +129,25 @@ const classifyQuestion = (input: string): string => {
     }
     return { category: rule.category, score };
   });
-
+  
   scores.sort((a, b) => b.score - a.score);
   const topScore = scores[0];
-
+  
   if (topScore.score < 2) {
     return "Null";
   }
-
+  
   return topScore.category;
 };
 
 const detectRelevantSection = (input: string): string => {
   const text = input.toLowerCase();
-
+  
   // Facilities/rooms/equipment
   if (/\b(room|facility|facilities|booking|book\s+a|equipment|camera|gear|lighting|lab\s+equipment)\b/.test(text)) {
     return "facilities";
   }
-
+  
   // Faculty/teaching staff
   if (/\b(teach|teaches|teaching|lecturer|instructor|professor|prof|faculty|who\s+(teaches?|is\s+the))\b/.test(text)) {
     return "faculty";
@@ -162,7 +157,7 @@ const detectRelevantSection = (input: string): string => {
   if (/\b(ukm|club|clubs|organization|organisations|student\s+org|bem|student\s+union)\b/.test(text)) {
     return "organizations";
   }
-
+  
   // Counseling/support
   if (/\b(counsel|counseling|counselor|mental\s+health|stress|therapy)\b/.test(text)) {
     return "support";
@@ -179,11 +174,25 @@ const extractQueryKeywords = (input: string): string[] => {
   return [...new Set((matches || []).map(k => k.toLowerCase()))];
 };
 
-
+export async function loader() {
+  return {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY
+  };
+}
 
 export function useChat() {
+  const { GEMINI_API_KEY, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY  } = useLoaderData();
+  
+  const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  
+  const supabase = createClient(
+    SUPABASE_URL!,
+    SUPABASE_PUBLISHABLE_KEY!,
+  );
   const [messages, setMessages] = useState<Message[]>([]);
-
+  
   const chatSession = useMemo(() => {
     return genAI.chats.create({
       model: "gemini-2.5-flash-lite",
@@ -195,7 +204,7 @@ export function useChat() {
       },
     });
   }, []);
-
+  
   const sendMessage = async (input: string) => {
     if (!input.trim()) return;
 
