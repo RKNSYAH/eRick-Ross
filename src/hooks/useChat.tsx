@@ -3,9 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import SYSTEM_INSTRUCTION from "../prompts/system.md?raw";
 import { compressContext } from "../scripts/compressText";
-import {useLoaderData} from "react-router"
-
-
 
 type Message = {
   role: "user" | "ai";
@@ -174,23 +171,17 @@ const extractQueryKeywords = (input: string): string[] => {
   return [...new Set((matches || []).map(k => k.toLowerCase()))];
 };
 
-export async function loader() {
-  return {
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY
-  };
-}
+type EnvConfig = {
+  GEMINI_API_KEY: string;
+  SUPABASE_URL: string;
+  SUPABASE_PUBLISHABLE_KEY: string;
+};
 
-export function useChat() {
-  const { GEMINI_API_KEY, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY  } = useLoaderData();
-  
-  const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-  
-  const supabase = createClient(
-    SUPABASE_URL!,
-    SUPABASE_PUBLISHABLE_KEY!,
-  );
+
+export function useChat(env: EnvConfig) {
+  const genAI = useMemo(() => new GoogleGenAI({ apiKey: env.GEMINI_API_KEY }), [env.GEMINI_API_KEY]);
+  const supabase = useMemo(() => createClient(env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY), [env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY]);
+
   const [messages, setMessages] = useState<Message[]>([]);
   
   const chatSession = useMemo(() => {

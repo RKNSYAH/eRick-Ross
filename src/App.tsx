@@ -3,6 +3,10 @@ import ChatField from './Components/ChatField'
 import FaqButton from './Components/FaqButton'
 import { useNavigate } from "react-router";
 
+export async function loader() {
+  // Home page doesn't need env vars since it just navigates
+  return null;
+}
 function App() {
   const navigate = useNavigate();
 

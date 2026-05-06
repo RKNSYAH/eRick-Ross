@@ -3,11 +3,28 @@ import ChatField from '../Components/ChatField.tsx'
 import ReactMarkdown from 'react-markdown';
 import { useChat } from '../hooks/useChat.tsx';
 import remarkGfm from "remark-gfm";
-import {useLocation} from "react-router"
+import {useLocation, useLoaderData} from "react-router"
+
+export async function loader() {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+
+  if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error("Missing required environment variables");
+  }
+
+  return {
+    GEMINI_API_KEY,
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY,
+  };
+}
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { messages, sendMessage } = useChat()
+    const loaderData = useLoaderData<typeof loader>();
+  const { messages, sendMessage } = useChat(loaderData);
   const location = useLocation();
   const hasProcessedInitial = useRef(false);
 
@@ -15,6 +32,8 @@ function App() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  
 
   useEffect(() => {
     const initialMessage = (location.state as { initialMessage?: string })?.initialMessage;
