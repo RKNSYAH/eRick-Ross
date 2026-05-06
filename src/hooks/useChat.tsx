@@ -6,6 +6,8 @@ import { compressContext } from "../scripts/compressText";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+console.log("SUPABASE_URL exists:", !!process.env.SUPABASE_URL);
+console.log("SUPABASE_KEY exists:", !!process.env.SUPABASE_ANON_KEY);
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_PUBLISHABLE_KEY!,
