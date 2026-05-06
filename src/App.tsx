@@ -14,22 +14,33 @@ function App() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src =
-      "https://app.realeye.io/sdk/js/testRunnerEmbeddableSdk-1.10.0.js";
-    script.async = true;
+  // Only run on client side
+  if (typeof window === 'undefined') return;
 
-    script.onload = () => {
-      (window as any).reSdk = new (window as any).EmbeddedPageSdk(
-        false,
-        null,
-        false,
-        false
-      );
-    };
+  const script = document.createElement("script");
+  script.type = "module";
+  script.textContent = `
+    import EmbeddedPageSdk from "https://app.realeye.io/sdk/js/testRunnerEmbeddableSdk-1.10.0.js";
+    window.reSdk = new EmbeddedPageSdk(false, null, false, false);
+    window.dispatchEvent(new Event('realeye-ready'));
+  `;
 
-    document.body.appendChild(script);
-  }, []);
+  // Append to head, not body — avoids hydration conflicts
+  document.head.appendChild(script);
+
+  const handleReady = () => {
+    console.log("✅ RealEye SDK loaded and initialized");
+  };
+  window.addEventListener('realeye-ready', handleReady);
+
+  return () => {
+    window.removeEventListener('realeye-ready', handleReady);
+    if (script.parentNode) {
+      script.parentNode.removeChild(script);
+    }
+  };
+}, []);
+
 
   const faqs = [
     {
@@ -88,7 +99,7 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col items-center pb-20 justify-center min-h-screen bg-primary px-3 py-3 overflow-x-hidden">
+    <div data-re-aoi-name="chat-input" className="flex flex-col items-center pb-20 justify-center min-h-screen bg-primary px-3 py-3 overflow-x-hidden">
       <div
         id="app"
         className="mb-4 w-full max-w-3xl shadow-md shadow-secondary/40 rounded-3xl bg-white overflow-hidden flex flex-col"
