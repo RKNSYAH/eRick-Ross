@@ -3,6 +3,8 @@ import { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { reactRouter } from '@react-router/dev/vite'
+import netlifyReactRouter from "@netlify/vite-plugin-react-router";
+
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -10,5 +12,6 @@ export default defineConfig({
     reactRouter(),
     tailwindcss(),
     babel({ presets: [reactCompilerPreset()] }),
+    netlifyReactRouter()
   ],
 })
