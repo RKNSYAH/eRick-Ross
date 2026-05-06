@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import './App.css'
 import ChatField from './Components/ChatField'
 import FaqButton from './Components/FaqButton'
@@ -12,35 +11,6 @@ export async function loader() {
 
 function App() {
   const navigate = useNavigate();
-
-  useEffect(() => {
-  // Only run on client side
-  if (typeof window === 'undefined') return;
-
-  const script = document.createElement("script");
-  script.type = "module";
-  script.textContent = `
-    import EmbeddedPageSdk from "https://app.realeye.io/sdk/js/testRunnerEmbeddableSdk-1.10.0.js";
-    window.reSdk = new EmbeddedPageSdk(false, null, false, false);
-    window.dispatchEvent(new Event('realeye-ready'));
-  `;
-
-  // Append to head, not body — avoids hydration conflicts
-  document.head.appendChild(script);
-
-  const handleReady = () => {
-    console.log("✅ RealEye SDK loaded and initialized");
-  };
-  window.addEventListener('realeye-ready', handleReady);
-
-  return () => {
-    window.removeEventListener('realeye-ready', handleReady);
-    if (script.parentNode) {
-      script.parentNode.removeChild(script);
-    }
-  };
-}, []);
-
 
   const faqs = [
     {
