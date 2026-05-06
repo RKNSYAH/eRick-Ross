@@ -4,13 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 import SYSTEM_INSTRUCTION from "../prompts/system.md?raw";
 import { compressContext } from "../scripts/compressText";
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-console.log("SUPABASE_URL exists:", !!process.env.SUPABASE_URL);
-console.log("SUPABASE_KEY exists:", !!process.env.SUPABASE_ANON_KEY);
+
 const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY!
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_PUBLISHABLE_KEY!,
 );
 
 type Message = {
