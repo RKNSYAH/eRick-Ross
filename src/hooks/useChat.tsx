@@ -44,9 +44,7 @@ const dedupeChunks = (chunks: Chunk[]): Chunk[] => {
 
 type CategoryRule = {
   category: string;
-  // Primary keywords: strong signals (score +3)
   primary: RegExp;
-  // Secondary keywords: weaker signals (score +1)
   secondary: RegExp;
 };
 
@@ -58,7 +56,7 @@ const CATEGORY_RULES: CategoryRule[] = [
   },
   {
     category: "Campus Directory",
-    primary: /\b(email|contact|phone|bursary|registry|spac|student\s+affairs|mas\s+arry|vcd\s+lab|book\s+(a\s+)?room|book\s+equipment|facility\s+booking)\b/i,
+    primary: /\b(email|teach|teaches|contact|ukm|club|organization|phone|bursary|registry|spac|student\s+affairs|mas\s+arry|vcd\s+lab|book\s+(a\s+)?room|book\s+equipment|facility\s+booking)\b/i,
     secondary: /\b(office|department|reach|who|address|staff|admin|booking|reserve)\b/i,
   },
   {
@@ -95,30 +93,50 @@ const CATEGORY_RULES: CategoryRule[] = [
 const classifyQuestion = (input: string): string => {
   const text = input.toLowerCase();
 
+  // ════════════════════════════════════════════
+  // INTENT OVERRIDES (check these first)
+  // ════════════════════════════════════════════
+
+  // If asking about WHO teaches/runs something → Campus Directory
+  if (/who\s+(teaches?|is\s+teaching|is\s+the\s+(lecturer|instructor|prof|teacher)|runs?|manages?|handles?)/i.test(text)) {
+    return "Campus Directory";
+  }
+
+  // If asking about a specific person's email/contact → Campus Directory
+  if (/\b(email|contact)\s+(of|for)\b/i.test(text)) {
+    return "Campus Directory";
+  }
+
+  // If asking "what is [COURSE_CODE]" → Course Catalog
+  if (/what\s+is\s+[a-z]{4}\d{4}/i.test(text)) {
+    return "Course Catalog";
+  }
+
+  // If asking "how many credits can I take" → Institutional Policy
+  if (/how\s+many\s+(credits?|subjects?|courses?)\s+(can|am\s+i\s+allowed)/i.test(text)) {
+    return "Institutional Policy";
+  }
+
+  // If asking "when is" something → Schedules & Logistics
+  if (/when\s+(is|does|do|are)\s+(the|my|this)/i.test(text)) {
+    return "Schedules & Logistics";
+  }
   const scores: { category: string; score: number }[] = CATEGORY_RULES.map(rule => {
     let score = 0;
-
-    // Count primary matches (strong signal)
     const primaryMatches = text.match(rule.primary);
     if (primaryMatches) {
       score += primaryMatches.length * 3;
     }
-
-    // Count secondary matches (weak signal)
     const secondaryMatches = text.match(rule.secondary);
     if (secondaryMatches) {
       score += secondaryMatches.length * 1;
     }
-
     return { category: rule.category, score };
   });
 
-  // Sort by score descending
   scores.sort((a, b) => b.score - a.score);
-
   const topScore = scores[0];
 
-  // Minimum threshold: need at least 1 primary match OR 2+ secondary matches
   if (topScore.score < 2) {
     return "Null";
   }
@@ -126,16 +144,41 @@ const classifyQuestion = (input: string): string => {
   return topScore.category;
 };
 
-const detectRelevantSection = (input: string) => {
+const detectRelevantSection = (input: string): string => {
   const text = input.toLowerCase();
-  if (text.includes("room") || text.includes("facility") || text.includes("booking")) {
+
+  // Facilities/rooms/equipment
+  if (/\b(room|facility|facilities|booking|book\s+a|equipment|camera|gear|lighting|lab\s+equipment)\b/.test(text)) {
     return "facilities";
   }
-  if (text.includes("lecturer") || text.includes("professor") || text.includes("course")) {
+
+  // Faculty/teaching staff
+  if (/\b(teach|teaches|teaching|lecturer|instructor|professor|prof|faculty|who\s+(teaches?|is\s+the))\b/.test(text)) {
     return "faculty";
   }
+
+  // Student organizations
+  if (/\b(ukm|club|clubs|organization|organisations|student\s+org|bem|student\s+union)\b/.test(text)) {
+    return "organizations";
+  }
+
+  // Counseling/support
+  if (/\b(counsel|counseling|counselor|mental\s+health|stress|therapy)\b/.test(text)) {
+    return "support";
+  }
+
+  // Default: administrative contacts
   return "admin";
 };
+
+const extractQueryKeywords = (input: string): string[] => {
+  const matches = input.match(
+    /\b(gpa|credits?|semester|course|attendance|grade|grading|exam|examination|registration|advisor|advising|leave|transfer|retake|probation|withdrawal|tuition|scholarship|internship|prerequisite|syllabus|krs|study\s*plan|acadis|portal|canvas|email|contact|schedule|calendar|short\s*semester|active|inactive)\b/gi
+  );
+  return [...new Set((matches || []).map(k => k.toLowerCase()))];
+};
+
+
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -163,7 +206,6 @@ export function useChat() {
 
     // Free keyword-based classification (no LLM call)
     const category = classifyQuestion(input);
-    console.log("Detected Category:", category);
 
     try {
       if (category !== "Null") {
@@ -175,28 +217,29 @@ export function useChat() {
         });
 
         let allChunks: Chunk[] = [];
+        const keywords = extractQueryKeywords(input); // ["gpa", "credits", "semester"]
 
         // Optional: pull contact info for policy questions
         const needsContact = /contact|email|who/i.test(input);
         if ((category === "Institutional Policy" || category === "Academic Planning") && needsContact) {
-          const { data: contactData } = await supabase.rpc("match_chunks_globally", {
+          const { data: contactData } = await supabase.rpc("match_chunks_v2", {
             query_embedding: new Array(768).fill(0),
             match_threshold: 0,
             match_count: 2,
-            doc_match_count: 1,
             filter_category: "Campus Directory",
-            query_text: "SPAC Academic Registry contact email",
+            filter_keywords: null,
           });
           if (contactData) allChunks.push(...contactData);
         }
 
-        const { data: contextData, error } = await supabase.rpc("match_chunks_globally", {
+        // In sendMessage, adjust the RPC call based on category
+        const { data: contextData, error } = await supabase.rpc("match_chunks_v2", {
           query_embedding: embeddingResult.embeddings?.[0].values,
-          match_threshold: 0.45,
-          match_count: 10,
-          doc_match_count: 2,
+          match_threshold: 0.3,
+          match_count: 15,
           filter_category: category,
-          query_text: input,
+          // Don't use keyword filtering for directory — rely on semantic search
+          filter_keywords: category === "Campus Directory" ? null : (keywords.length > 0 ? keywords : null),
         });
 
         if (error) {
@@ -206,6 +249,19 @@ export function useChat() {
 
         if (contextData) {
           allChunks.push(...contextData);
+        }
+
+        if (allChunks.length < 2) {
+          const { data: fallbackData } = await supabase.rpc("match_chunks_v2", {
+            query_embedding: embeddingResult.embeddings?.[0].values,
+            match_threshold: 0.25,  // Lower threshold for fallback
+            match_count: 15,
+            filter_category: category,
+            filter_keywords: null,  // No keyword filter
+          });
+          if (fallbackData && fallbackData.length > 0) {
+            allChunks = fallbackData;  // Replace, don't append
+          }
         }
 
         // Pipeline: dedupe → clean → sort → cap → budget
@@ -221,7 +277,7 @@ export function useChat() {
         let charCount = 0;
         const budgeted: Chunk[] = [];
         for (const chunk of allChunks) {
-          if (charCount + chunk.content_text.length > 22000) break;
+          if (charCount + chunk.content_text.length > 15000) break;
           budgeted.push(chunk);
           charCount += chunk.content_text.length;
         }
@@ -231,17 +287,90 @@ export function useChat() {
         let finalChunks = allChunks;
         if (category === "Campus Directory") {
           const section = detectRelevantSection(input);
-          finalChunks = allChunks.filter((chunk) => {
-            const text = chunk.content_text.toLowerCase();
-            if (section === "facilities") {
-              return text.includes("facility") || text.includes("booking") || text.includes("room") || text.includes("arry");
-            }
-            if (section === "faculty") {
-              return text.includes("course") || text.includes("lecturer");
-            }
-            return text.includes("bursary") || text.includes("registry") || text.includes("spac") || text.includes("student affairs");
-          });
+          const inputLower = input.toLowerCase();
+
+          // Extract specific terms from the query to match against chunks
+          // e.g., "OOP" → look for "oop" or "object oriented" in chunks
+          // e.g., "bursary email" → look for "bursary" in chunks
+          const queryTerms = inputLower
+            .split(/\s+/)
+            .filter(t => t.length > 2)
+            .filter(t => !["the", "what", "who", "how", "can", "does", "for", "and", "this", "that", "please", "send"].includes(t));
+
+          if (section === "facilities") {
+            finalChunks = allChunks.filter((chunk) => {
+              const text = chunk.content_text.toLowerCase();
+              return (
+                text.includes("facility") ||
+                text.includes("booking") ||
+                text.includes("room") ||
+                text.includes("arry") ||
+                text.includes("vcd.lab") ||
+                text.includes("equipment")
+              );
+            });
+          } else if (section === "faculty") {
+            // For faculty questions, DON'T aggressively filter
+            // The semantic search should already have found the right chunks
+            // Just remove obviously irrelevant admin-only chunks
+            finalChunks = allChunks.filter((chunk) => {
+              const text = chunk.content_text.toLowerCase();
+              // Keep chunks that have: email addresses, course codes, instructor names, or query terms
+              const hasEmail = /@sampoernauniversity\.ac\.id/.test(text);
+              const hasCourseCode = /[a-z]{4}\d{4}/.test(text);
+              const hasTeachingTerms = /\b(teach|instructor|lecturer|professor|head\s+of\s+program|dean|faculty)\b/.test(text);
+              const hasQueryMatch = queryTerms.some(term => text.includes(term));
+
+              return hasEmail || hasCourseCode || hasTeachingTerms || hasQueryMatch;
+            });
+          } else if (section === "organizations") {
+            finalChunks = allChunks.filter((chunk) => {
+              const text = chunk.content_text.toLowerCase();
+              return (
+                text.includes("organization") ||
+                text.includes("ukm") ||
+                text.includes("bem") ||
+                text.includes("student activities") ||
+                text.includes("club") ||
+                text.includes("religious") ||
+                text.includes("sports") ||
+                text.includes("arts")
+              );
+            });
+          } else if (section === "support") {
+            finalChunks = allChunks.filter((chunk) => {
+              const text = chunk.content_text.toLowerCase();
+              return (
+                text.includes("counseling") ||
+                text.includes("counselor") ||
+                text.includes("student.counseling") ||
+                text.includes("mental health")
+              );
+            });
+          } else {
+            // Admin section — only filter if we have enough chunks
+            const adminFiltered = allChunks.filter((chunk) => {
+              const text = chunk.content_text.toLowerCase();
+              return (
+                text.includes("bursary") ||
+                text.includes("registry") ||
+                text.includes("spac") ||
+                text.includes("student affairs") ||
+                text.includes("student.affairs") ||
+                text.includes("academic.registry") ||
+                text.includes("@sampoernauniversity")
+              );
+            });
+            // Only apply filter if it doesn't eliminate everything
+            finalChunks = adminFiltered.length > 0 ? adminFiltered : allChunks;
+          }
+
+          // Safety: if filtering removed everything, fall back to unfiltered
+          if (finalChunks.length === 0) {
+            finalChunks = allChunks;
+          }
         }
+
 
         // Build context
         const contextText = category === "Campus Directory"
@@ -250,12 +379,9 @@ export function useChat() {
 
         const messageFormat = `[Context]\n${contextText}\n\n[Question]\n${input}`;
 
-        console.log("Context length:", contextText.length, "chars");
-        console.log(messageFormat);
 
         const result = await chatSession.sendMessageStream({ message: messageFormat });
 
-        let totalTokenUsed;
         for await (const chunk of result) {
           setMessages((prev) => {
             const updated = [...prev];
@@ -267,9 +393,7 @@ export function useChat() {
             };
             return updated;
           });
-          totalTokenUsed = chunk.usageMetadata;
         }
-        console.log("Total tokens used:", totalTokenUsed);
       } else {
         const messageFormat = `[Question]\n${input}\n\nRespond as eRick Ross. Since this is a general or social message, be warm and welcoming. Remind them that you are here to help with Sampoerna University related questions whenever they need it!`;
 
