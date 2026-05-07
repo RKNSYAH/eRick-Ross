@@ -3,7 +3,7 @@ import ChatField from '../Components/ChatField.tsx'
 import ReactMarkdown from 'react-markdown';
 import { useChat } from '../hooks/useChat.tsx';
 import remarkGfm from "remark-gfm";
-import {useLocation, useLoaderData} from "react-router"
+import { useLocation, useLoaderData } from "react-router"
 
 export async function loader() {
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -23,7 +23,7 @@ export async function loader() {
 
 function App() {
   const [isExpanded, setIsExpanded] = useState(false);
-    const loaderData = useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
   const { messages, sendMessage } = useChat(loaderData);
   const location = useLocation();
   const hasProcessedInitial = useRef(false);
@@ -33,7 +33,7 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  
+
 
   useEffect(() => {
     const initialMessage = (location.state as { initialMessage?: string })?.initialMessage;
@@ -87,7 +87,13 @@ function App() {
 
                   <div className="flex flex-row self-start gap-3">
                     <>
-                      <img src="/sulogo.png" className='w-7 h-7 md:w-9 md:h-9 rounded-full border-3 border-primary' alt="eRick Ross Logo" />
+                      <div className="w-7 h-7 md:w-9 md:h-9 rounded-full overflow-hidden border-3 border-primary shrink-0">
+                        <img
+                          src="/erik.jpg"
+                          className="w-full h-full object-cover scale-[2.8] origin-[50%_10%]"
+                          alt="eRick Ross Logo"
+                        />
+                      </div>
                       <div className="relative mt-5">
                         <div className="relative color-primary bg-primary text-white px-4 py-2 rounded-2xl rounded-tl-none shadow-md">
                           {message.isLoading ? (
