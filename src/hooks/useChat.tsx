@@ -240,7 +240,7 @@ export function useChat(env: EnvConfig) {
           match_count: 15,
           filter_category: category,
           // Don't use keyword filtering for directory — rely on semantic search
-          filter_keywords: category === "Campus Directory" ? null : (keywords.length > 0 ? keywords : null),
+          filter_keywords: category === "Campus Directory" || category === "Course Catalog" ? null : (keywords.length > 0 ? keywords : null),
         });
 
         if (error) {
@@ -251,6 +251,9 @@ export function useChat(env: EnvConfig) {
         if (contextData) {
           allChunks.push(...contextData);
         }
+        console.log(category)
+        console.log("Chunks length: " + allChunks.length)
+        console.log(allChunks)
 
         if (allChunks.length < 2) {
           const { data: fallbackData } = await supabase.rpc("match_chunks_v2", {
@@ -372,14 +375,17 @@ export function useChat(env: EnvConfig) {
           }
         }
 
+        console.log("Final chunks: " + finalChunks.length)
+
 
         // Build context
         const contextText = category === "Campus Directory"
-          ? finalChunks.map(c => c.content_text).join("\n\n")
-          : compressContext(finalChunks, category);
+          ? allChunks.map(c => c.content_text).join("\n\n")
+          : compressContext(allChunks, category);
 
         const messageFormat = `[Context]\n${contextText}\n\n[Question]\n${input}`;
-
+        
+        console.log(messageFormat)
 
         const result = await chatSession.sendMessageStream({ message: messageFormat });
 
