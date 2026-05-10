@@ -420,6 +420,32 @@ export function useChat(env: EnvConfig) {
         }
       }
     } catch (err) {
+
+      let errorMessage = "";
+
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const errName = err instanceof Error ? err.name : "";
+
+      if (errMsg.includes("network") || errName === "TypeError") {
+        errorMessage = "Looks like there's a connection issue. Check your internet and try again!";
+      } else if (errMsg.includes("429") || errMsg.includes("quota")) {
+        errorMessage = "I'm getting a lot of questions right now. Give me a moment and try again in a few seconds.";
+      } else {
+        errorMessage = "Something went wrong on my end. Try sending that again — if it persists, a quick page refresh usually fixes it.";
+      }
+
+      console.error("❌ Chat error:", errMsg);
+
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        updated[lastIndex] = {
+          role: "ai",
+          text: errorMessage,
+          isLoading: false,
+        };
+        return updated;
+  });
       console.error(err);
     }
   };
