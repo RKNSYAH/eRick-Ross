@@ -15,11 +15,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <ScrollRestoration />
         <Scripts />
-        {/* RealEye SDK — placed AFTER Scripts so React is fully hydrated first */}
-        <script type="module" dangerouslySetInnerHTML={{ __html: `
-          import EmbeddedPageSdk from "https://app.realeye.io/sdk/js/testRunnerEmbeddableSdk-1.10.0.js";
-          window.reSdk = new EmbeddedPageSdk(false, null, false);
-        `}} />
       </body>
     </html>
   );

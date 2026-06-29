@@ -5,12 +5,43 @@ import path from "path";
 import "dotenv/config";
 import { PDFParse } from "pdf-parse";
 
-const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const AI_PROVIDER = process.env.AI_PROVIDER || "gemini";
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+const OLLAMA_EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text";
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const genAI = AI_PROVIDER === "gemini"
+  ? new GoogleGenAI({ apiKey: GEMINI_API_KEY })
+  : null;
+
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_PUBLISHABLE_KEY!,
 );
+
+async function embedText(text: string): Promise<number[]> {
+  if (AI_PROVIDER === "ollama") {
+    const truncated = text.length > 2000 ? text.slice(0, 2000) : text;
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: OLLAMA_EMBEDDING_MODEL, prompt: truncated }),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "no body");
+      throw new Error(`Ollama embedding failed (${response.status}): ${body}`);
+    }
+    const data = await response.json();
+    return data.embedding;
+  }
+
+  const result = await genAI!.models.embedContent({
+    model: "gemini-embedding-2",
+    contents: [{ text }],
+    config: { outputDimensionality: 768 },
+  });
+  return result.embeddings?.[0]?.values ?? [];
+}
 
 const FILE_CATEGORY_MAP: Record<string, string> = {
   "Course Description All SU Courses_202410.pdf": "Course Catalog",
@@ -518,18 +549,25 @@ async function injectDocument() {
     const buffer = fs.readFileSync(path.join(folderPath, file));
     const pdfBase64 = buffer.toString("base64");
 
-    const pdfEmbed = await genAI.models.embedContent({
-      model: "gemini-embedding-2",
-      contents: [{
-        inlineData: {
-          mimeType: "application/pdf",
-          data: pdfBase64,
-        },
-      }],
-      config: { outputDimensionality: 768 }
-    });
-
-    const pdfEmbedding = pdfEmbed.embeddings?.[0].values;
+    let pdfEmbedding: number[];
+    if (AI_PROVIDER === "ollama") {
+      // Ollama can't embed raw PDF bytes, so use text-based embedding
+      const parsed = new PDFParse({ data: buffer });
+      const text = await parsed.getText();
+      pdfEmbedding = await embedText(text.text.slice(0, 800));
+    } else {
+      const pdfEmbed = await genAI!.models.embedContent({
+        model: "gemini-embedding-2",
+        contents: [{
+          inlineData: {
+            mimeType: "application/pdf",
+            data: pdfBase64,
+          },
+        }],
+        config: { outputDimensionality: 768 }
+      });
+      pdfEmbedding = pdfEmbed.embeddings?.[0]?.values ?? [];
+    }
 
     const savePdf = await supabase.from("sudocuments").insert({
       file_name: file,
@@ -537,7 +575,7 @@ async function injectDocument() {
     }).select().single()
 
     if (savePdf.error) {
-      console.error(`❌ Document insert failed:`, savePdf.error);
+      console.error(` Document insert failed:`, savePdf.error);
       continue;
     }
 
@@ -555,17 +593,7 @@ async function injectDocument() {
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
 
-      const response = await genAI.models.embedContent({
-        model: "gemini-embedding-2",
-        contents: [
-          {
-            text: chunk.content_text,
-          },
-        ],
-        config: {
-          outputDimensionality: 768,
-        },
-      });
+      const embedding = await embedText(chunk.content_text);
 
       rows.push({
         document_id: documentId,
@@ -575,10 +603,9 @@ async function injectDocument() {
         category: chunk.category,
         chunk_index: i,
         topic_keywords: chunk.topic_keywords,
-        embedding: response.embeddings?.[0].values,
+        embedding,
       });
       console.log(`  ↳ chunk ${i} embedded`);
-
     }
     const result = await supabase
       .from("sudocumentvector")

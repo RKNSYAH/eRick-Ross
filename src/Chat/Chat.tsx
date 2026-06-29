@@ -5,14 +5,42 @@ import ReactMarkdown from 'react-markdown';
 import { useChat } from '../hooks/useChat.tsx';
 import remarkGfm from "remark-gfm";
 
-export async function loader() {
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+type LoaderEnv = {
+  AI_PROVIDER: string;
+  GEMINI_API_KEY?: string;
+  SUPABASE_URL: string;
+  SUPABASE_PUBLISHABLE_KEY: string;
+  OLLAMA_BASE_URL?: string;
+  OLLAMA_EMBEDDING_MODEL?: string;
+  OLLAMA_GENERATION_MODEL?: string;
+};
+
+export async function loader(): Promise<LoaderEnv> {
+  const AI_PROVIDER = process.env.AI_PROVIDER || "gemini";
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     throw new Error("Missing required environment variables");
   }
-  return { GEMINI_API_KEY, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY };
+
+  const loaderEnv: LoaderEnv = {
+    AI_PROVIDER,
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY,
+  };
+
+  if (AI_PROVIDER === "gemini") {
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("Missing GEMINI_API_KEY environment variable");
+    }
+    loaderEnv.GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  } else {
+    loaderEnv.OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+    loaderEnv.OLLAMA_EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text";
+    loaderEnv.OLLAMA_GENERATION_MODEL = process.env.OLLAMA_GENERATION_MODEL || "llama3.1:8b";
+  }
+
+  return loaderEnv;
 }
 
 function App() {
@@ -81,6 +109,11 @@ function App() {
               />
             </div>
             <span className="text-sm font-semibold text-primary">eRick Ross</span>
+            {loaderData.AI_PROVIDER === "ollama" && (
+              <span className="text-[10px] font-mono bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full ml-1" title={`Embed: ${loaderData.OLLAMA_EMBEDDING_MODEL} | Gen: ${loaderData.OLLAMA_GENERATION_MODEL}`}>
+                LOCAL
+              </span>
+            )}
           </div>
         </div>
 
@@ -131,6 +164,11 @@ function App() {
             ))}
           </section>
             <div ref={messagesEndRef} />
+            {loaderData.AI_PROVIDER === "ollama" && (
+              <div className="sticky bottom-0 text-center text-[10px] text-gray-400 py-1 bg-white/80 backdrop-blur-sm">
+                Running locally on {loaderData.OLLAMA_GENERATION_MODEL}
+              </div>
+            )}
         </div>
       </div>
 
