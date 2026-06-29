@@ -22,6 +22,7 @@
     "dotenv": "^17.4.2",
     "isbot": "^5",
     "lightningcss": "^1.32.0",
+    "ollama": "^0.6.3",
     "pdf-parse": "^2.4.5",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

@@ -5,10 +5,17 @@ import { compressContext } from "../scripts/compressText";
 import { createEmbeddingService, createGenerationService } from "../services/factory";
 import type { EmbeddingService, GenerationService, AiProvider } from "../services/types";
 
+type PerformanceMetrics = {
+  timeToFirstToken: number;
+  tokensPerSecond: number;
+  totalTime: number;
+};
+
 type Message = {
   role: "user" | "ai";
   text: string;
   isLoading?: boolean;
+  metrics?: PerformanceMetrics;
 };
 
 type Chunk = {
@@ -164,6 +171,36 @@ type EnvConfig = {
   OLLAMA_EMBEDDING_MODEL?: string;
   OLLAMA_GENERATION_MODEL?: string;
 };
+
+async function streamWithMetrics(
+  stream: AsyncGenerator<string>,
+  onChunk: (text: string) => void,
+): Promise<PerformanceMetrics> {
+  const startTime = performance.now();
+  let firstTokenTime = 0;
+  let charCount = 0;
+  let hasYielded = false;
+
+  for await (const chunk of stream) {
+    if (!hasYielded) {
+      firstTokenTime = performance.now();
+      hasYielded = true;
+    }
+    charCount += chunk.length;
+    onChunk(chunk);
+  }
+
+  const totalTime = performance.now() - startTime;
+  const ttft = hasYielded ? firstTokenTime - startTime : totalTime;
+  const elapsed = totalTime - ttft;
+  const tokensPerSecond = elapsed > 0 ? (charCount / 4) / (elapsed / 1000) : 0;
+
+  return {
+    timeToFirstToken: Math.round(ttft),
+    tokensPerSecond: Math.round(tokensPerSecond * 10) / 10,
+    totalTime: Math.round(totalTime),
+  };
+}
 
 export function useChat(env: EnvConfig) {
   const provider: AiProvider = (env.AI_PROVIDER as AiProvider) || "gemini";
@@ -372,9 +409,10 @@ export function useChat(env: EnvConfig) {
         const stream = generationService.generate({
           messages: historyForLlm,
           systemPrompt: SYSTEM_INSTRUCTION,
+          maxTokens: 3072,
         });
 
-        for await (const chunk of stream) {
+        const metrics = await streamWithMetrics(stream, (chunk) => {
           setMessages((prev) => {
             const updated = [...prev];
             const lastIndex = updated.length - 1;
@@ -385,9 +423,16 @@ export function useChat(env: EnvConfig) {
             };
             return updated;
           });
-        }
+        });
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastIndex = updated.length - 1;
+          updated[lastIndex] = { ...updated[lastIndex], metrics };
+          return updated;
+        });
       } else {
-        const messageFormat = `[Question]\n${input}\n\nRespond as eRick Ross. Since this is a general or social message, be warm and welcoming. Remind them that you are here to help with Sampoerna University related questions whenever they need it!`;
+        const messageFormat = `[Question]\n${input}`;
 
         const historyForLlm = messagesRef.current
           .filter(m => !m.isLoading && m.text)
@@ -398,9 +443,10 @@ export function useChat(env: EnvConfig) {
         const stream = generationService.generate({
           messages: historyForLlm,
           systemPrompt: SYSTEM_INSTRUCTION,
+          maxTokens: 3072,
         });
 
-        for await (const chunk of stream) {
+        const metrics = await streamWithMetrics(stream, (chunk) => {
           setMessages((prev) => {
             const updated = [...prev];
             const lastIndex = updated.length - 1;
@@ -411,7 +457,14 @@ export function useChat(env: EnvConfig) {
             };
             return updated;
           });
-        }
+        });
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastIndex = updated.length - 1;
+          updated[lastIndex] = { ...updated[lastIndex], metrics };
+          return updated;
+        });
       }
     } catch (err) {
       let errorMessage = "";

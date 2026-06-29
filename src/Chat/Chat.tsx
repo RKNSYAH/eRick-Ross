@@ -156,6 +156,13 @@ function App() {
                             </ReactMarkdown>
                           </div>
                         )}
+                        {message.metrics && !message.isLoading && (
+                          <div className="text-[10px] text-white/50 mt-1.5 border-t border-white/10 pt-1 flex gap-2">
+                            <span>ttft {message.metrics.timeToFirstToken}ms</span>
+                            <span>{message.metrics.tokensPerSecond} tok/s</span>
+                            <span>{(message.metrics.totalTime / 1000).toFixed(1)}s</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
